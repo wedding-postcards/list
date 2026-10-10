@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Готовые решения для бизнеса · Карта Макса</title>
+<style>
+  :root{
+    --bg:#050505;
+    --card:#0d0d0d;
+    --line:#3a3a3a;
+    --border:#232323;
+    --border-hover:#4a4a4a;
+    --txt:#e8e8e8;
+    --txt-dim:#8a8a8a;
+    --txt-faint:#555;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;}
+  body{
+    background:var(--bg);
+    color:var(--txt);
+    font-family:"Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    user-select:none;-webkit-user-select:none;
+  }
+
+  /* ── header ─────────────────────────────── */
+  header{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 22px;pointer-events:none;
+  }
+  .logo{font-weight:700;font-size:16px;letter-spacing:-.02em;pointer-events:auto;}
+  .logo span{color:var(--txt-dim);font-weight:400;}
+  .chips{display:flex;gap:6px;pointer-events:auto;}
+  .chip{
+    font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+    border:1px solid var(--border);border-radius:20px;
+    padding:5px 12px;color:var(--txt-dim);
+    background:rgba(13,13,13,.85);cursor:pointer;transition:.25s;
+  }
+  .chip:hover{color:var(--txt);border-color:var(--border-hover);}
+
+  /* ── viewport / canvas ──────────────────── */
+  #viewport{
+    position:fixed;inset:0;
+    overflow:hidden;
+    cursor:grab;
+    touch-action:none;
+  }
+  #viewport.panning{cursor:grabbing;}
+  body.pen #viewport{cursor:crosshair;}
+  #canvas{
+    position:absolute;top:0;left:0;
+    width:6000px;height:9000px;
+    transform-origin:0 0;
+    background-image:radial-gradient(circle, rgba(255,255,255,.07) 1px, transparent 1.1px);
+    background-size:26px 26px;
+  }
+  #content{
+    position:absolute;left:2400px;top:160px;
+    width:1200px;
+  }
+  #ink{
+    position:absolute;top:0;left:0;
+    width:6000px;height:9000px;
+    pointer-events:none;
+    z-index:10; /* рисование поверх карточек */
+  }
+  #ink path{
+    fill:none;stroke:#fff;stroke-width:2;
+    stroke-linecap:round;stroke-linejoin:round;
+    opacity:.9;
+  }
+
+  /* ── board ──────────────────────────────── */
+  .board{
+    position:relative;
+    padding:20px 20px 60px;
+  }
+  #wires{
+    position:absolute;inset:0;width:100%;height:100%;
+    pointer-events:none;z-index:0;
+  }
+  #wires path{stroke:var(--line);stroke-width:1.2;fill:none;stroke-linecap:round;opacity:.78;}
+  #wires circle{fill:#cfcfcf;}
+
+  /* ── cards ──────────────────────────────── */
+  .node-card{
+    position:relative;z-index:2;
+    width:460px;
+    background:var(--card);
+    border:1px solid var(--border);
+    margin:70px 0;
+    opacity:0;transform:translateY(26px);
+    transition:opacity .7s ease, transform .7s ease, border-color .25s, box-shadow .25s;
+    cursor:pointer;
+  }
+  body.pen .node-card{cursor:crosshair;}
+  .node-card.show{opacity:1;transform:translateY(0);}
+  .node-card:hover{border-color:var(--border-hover);box-shadow:0 12px 40px rgba(0,0,0,.55);}
+  .node-card.left{margin-right:auto;}
+  .node-card.right{margin-left:auto;}
+  .node-card.center{margin-left:auto;margin-right:auto;}
+
+  .thumb{height:140px;position:relative;overflow:hidden;}
+  .thumb::after{
+    content:"";position:absolute;inset:0;
+    background-image:radial-gradient(circle,rgba(255,255,255,.10) 1px,transparent 1px);
+    background-size:9px 9px;
+    mix-blend-mode:overlay;
+  }
+  .thumb .num{
+    position:absolute;right:12px;bottom:6px;
+    font-size:64px;font-weight:700;letter-spacing:-.05em;
+    color:rgba(255,255,255,.10);line-height:1;
+  }
+  .t1{background:linear-gradient(135deg,#2b1c10,#743d12 55%,#c96a1e);}
+  .t2{background:linear-gradient(135deg,#101821,#1d3242 60%,#3c6a86);}
+  .t3{background:linear-gradient(135deg,#1d1022,#3d1f4d 55%,#7b3f96);}
+  .t4{background:linear-gradient(135deg,#0d1f16,#1c4630 60%,#3a8a5c);}
+  .t5{background:linear-gradient(135deg,#211c0d,#4d431f 55%,#96843f);}
+  .t6{background:linear-gradient(135deg,#210d0f,#4d1f24 55%,#963f4a);}
+  .t7{background:linear-gradient(135deg,#0d1e21,#1f4a4d 55%,#3f9096);}
+  .t8{background:linear-gradient(135deg,#1f0d1a,#4d1f40 55%,#963f7c);}
+  .t9{background:linear-gradient(135deg,#141f0d,#33501c 55%,#6d9a35);}
+  .t0{background:linear-gradient(135deg,#161616,#2c2c2c 55%,#4e4e4e);}
+
+  .card-body{padding:16px 16px 12px;}
+  .meta{display:flex;font-size:11px;line-height:1.9;}
+  .meta b{color:var(--txt-dim);font-weight:400;min-width:96px;}
+  .meta span{color:var(--txt);font-weight:500;}
+  .card-title{font-size:15px;font-weight:600;letter-spacing:-.01em;margin-bottom:8px;}
+
+  .details{max-height:0;overflow:hidden;transition:max-height .5s ease;}
+  .dwrap{border-top:1px solid var(--border);margin-top:10px;padding-top:2px;}
+  .sub{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt-faint);margin:12px 0 7px;}
+  .tags{display:flex;flex-wrap:wrap;gap:5px;}
+  .tags i{font-style:normal;font-size:10.5px;color:#c9c9c9;border:1px solid #2b2b2b;border-radius:14px;padding:3px 9px;background:#101010;line-height:1.4;}
+  .details p{font-size:12px;color:#bdbdbd;line-height:1.6;margin:10px 0 4px;}
+  .details ul{list-style:none;margin:0 0 4px;}
+  .details li{
+    position:relative;padding:4px 0 4px 16px;
+    font-size:12px;color:#bdbdbd;line-height:1.5;
+  }
+  .details li::before{
+    content:"";position:absolute;left:2px;top:11px;
+    width:4px;height:4px;border-radius:50%;background:#7a7a7a;
+  }
+  .details li s{color:#666;}
+  .card-foot{
+    padding:9px 16px;border-top:1px solid var(--border);
+    font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-dim);
+  }
+  .card-foot .more::after{content:"+";margin-left:6px;display:inline-block;transition:transform .3s;}
+  .node-card.open .card-foot .more::after{transform:rotate(45deg);}
+  .node-card.open .details{max-height:1200px;}
+
+  .card-foot{position:relative;}
+  .drag-handle{position:absolute;right:12px;top:7px;width:24px;height:20px;border:1px solid var(--border);border-radius:5px;color:var(--txt-faint);display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1;cursor:move;user-select:none;}
+  .drag-handle:hover{color:var(--txt);border-color:var(--border-hover);background:#171717;}
+  .node-card.dragging{z-index:20;box-shadow:0 18px 55px rgba(0,0,0,.65);}
+  /* ── toolbar ────────────────────────────── */
+  .toolbar{
+    position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    z-index:60;display:flex;align-items:center;gap:2px;
+    background:rgba(13,13,13,.92);
+    border:1px solid var(--border);border-radius:12px;
+    padding:5px;backdrop-filter:blur(8px);
+  }
+  .tool{
+    width:34px;height:34px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--txt-dim);cursor:pointer;transition:.2s;
+    font-size:14px;
+  }
+  .tool:hover{color:var(--txt);background:#1a1a1a;}
+  .tool.active{color:#050505;background:#e8e8e8;}
+  .tool svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+  .sep{width:1px;height:20px;background:var(--border);margin:0 5px;}
+  .zoom-val{
+    min-width:44px;text-align:center;
+    font-size:11px;color:var(--txt-dim);letter-spacing:.04em;
+  }
+
+  /* Карточки и линии используют единую систему координат холста. */
+  #content{left:0;top:0;width:6000px;height:9000px;}
+  .board{position:absolute;inset:0;width:6000px;height:9000px;padding:0;}
+  #wires{width:6000px;height:9000px;overflow:visible;}
+  #ink{overflow:visible;}
+  #wires .wire{stroke:#777;stroke-width:1.5;opacity:1;vector-effect:non-scaling-stroke;}
+  #wires .wire-hit{stroke:transparent;stroke-width:18;pointer-events:stroke;cursor:pointer;vector-effect:non-scaling-stroke;}
+  #wires .wire-preview{stroke:#aaa;stroke-dasharray:5 5;vector-effect:non-scaling-stroke;}
+  #wires .wire-group:hover .wire{stroke:#ddd;}
+  .node-card{position:absolute;margin:0;transform:none;cursor:default;}
+  .node-card.show{transform:none;}
+  .node-card.left,.node-card.right,.node-card.center{margin:0;}
+  .node-card.open{z-index:3;}
+  .node-card.dragging{z-index:20;}
+  .thumb::after{pointer-events:none;}
+  .card-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .card-actions{display:flex;gap:4px;align-items:center;}
+  button{font-family:inherit;color:inherit;}
+  .tool{border:0;background:transparent;}
+  .more,.card-action{border:0;background:none;color:var(--txt-dim);cursor:pointer;}
+  .more{font-size:10px;letter-spacing:.08em;text-transform:uppercase;text-align:left;padding:3px 0;}
+  .more::after{content:"+";margin-left:6px;display:inline-block;transition:transform .2s;}
+  .node-card.open .more::after{transform:rotate(45deg);}
+  .card-action{width:28px;height:26px;border:1px solid var(--border);border-radius:5px;font-size:16px;}
+  .card-action:hover{border-color:var(--border-hover);color:var(--txt);}
+  .drag-handle{position:static;display:flex;width:28px;height:26px;cursor:grab;}
+  .drag-handle:active{cursor:grabbing;}
+  .port{position:absolute;width:32px;height:32px;border:0;background:transparent;z-index:5;padding:0;cursor:crosshair;touch-action:none;}
+  .port::after{content:"";position:absolute;inset:10px;border:1.5px solid #9c9c9c;background:#0d0d0d;border-radius:50%;transition:background .15s,border-color .15s;}
+  .port:hover::after,.port.selected::after{background:#e8e8e8;border-color:#e8e8e8;}
+  .port[data-side="top"]{top:-16px;left:calc(50% - 16px);}
+  .port[data-side="bottom"]{bottom:-16px;left:calc(50% - 16px);}
+  .port[data-side="left"]{left:-16px;top:calc(50% - 16px);}
+  .port[data-side="right"]{right:-16px;top:calc(50% - 16px);}
+  [contenteditable="true"]{cursor:text;user-select:text;-webkit-user-select:text;outline:none;overflow-wrap:anywhere;white-space:pre-wrap;}
+  [contenteditable="true"]:focus{outline:1px dashed #666;outline-offset:3px;}
+  button:focus-visible{outline:2px solid #ddd;outline-offset:3px;}
+  .meta span{min-width:0;}
+  .logo{background:rgba(5,5,5,.9);padding:4px 0;}
+  /* Заголовок восстановлен из исходного образца и принадлежит холсту. */
+  .hero{position:absolute;width:1200px;z-index:2;display:flex;flex-direction:column;align-items:center;text-align:center;padding:10px 20px 30px;}
+  .hero h1{max-width:100%;font-size:54px;font-weight:700;letter-spacing:-.03em;line-height:1.05;}
+  .hero h1 em{font-style:normal;color:var(--txt-dim);}
+  .hero.dragging{z-index:20;}
+  .hero .heading-handle{margin-top:12px;}
+  [data-field],[data-map-field]{white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text;}
+  [hidden]{display:none!important;}
+  body:not(.editing) #wires .wire-hit{pointer-events:none;}
+  #editToggle[aria-pressed="true"]{color:var(--txt);border-color:var(--border-hover);}
+  .chip{white-space:nowrap;}
+  #hint{position:fixed;bottom:72px;left:18px;right:18px;text-align:center;font-size:11px;line-height:1.5;color:var(--txt-dim);pointer-events:none;z-index:40;}
+  @media(max-width:760px){
+    header{padding:12px;gap:10px;align-items:flex-start;flex-wrap:wrap;background:rgba(5,5,5,.9);}
+    .logo{font-size:14px;}.logo>span:last-child{display:none;}
+    .chips{flex-wrap:wrap;gap:4px;}.chip{padding:5px 8px;font-size:9px;}
+    .toolbar{bottom:12px;}#hint{bottom:65px;font-size:10px;}
+  }
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;}}
+  /* Копия каталога: крупная карточка направления, независимые описания. */
+  .node-card{width:620px;}
+  .thumb .card-title{position:relative;z-index:1;max-width:490px;margin:0;padding:24px 24px 16px;font-size:32px;line-height:1.14;font-weight:600;}
+  .solution-list{margin-top:14px;max-height:1000px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-color:#555 #111;scrollbar-width:thin;}
+  .solution-item{border-top:1px solid var(--border);}
+  .solution-toggle{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:12px 2px;border:0;background:none;text-align:left;color:var(--txt);font-size:14px;line-height:1.45;cursor:pointer;}
+  .solution-toggle:hover{color:#fff;background:#151515;}
+  .solution-toggle.priority,.solution-toggle.priority:hover{color:#ff6b6b;}
+  .solution-toggle.hvac-fit,.solution-toggle.hvac-fit:hover{color:#74d69c;}
+  .solution-toggle::after{content:"+";margin-left:auto;flex-shrink:0;color:var(--txt-dim);font-size:18px;}
+  .solution-toggle[aria-expanded="true"]::after{content:"−";}
+  .solution-description{padding:0 24px 14px 2px;font-size:14px;line-height:1.65;color:#bdbdbd;user-select:text;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Карта Макса<span> / интерактивная карта</span></div>
+  <div class="chips">
+    <button class="chip" id="editToggle" aria-pressed="false">Режим редактирования</button>
+    <button class="chip edit-only edit-control" id="addNode" hidden disabled>+ Карточка</button>
+    <button class="chip" id="openAll">Раскрыть всё</button>
+    <button class="chip" id="closeAll">Свернуть</button>
+    <button class="chip" id="saveMap">Сохранить HTML</button>
+  </div>
+</header>
+<div id="viewport">
+  <div id="canvas">
+    <svg id="ink" viewBox="0 0 6000 9000" aria-hidden="true"></svg>
+    <div id="content"><div class="board" id="board">
+      <svg id="wires" viewBox="0 0 6000 9000" aria-label="Связи карты"></svg>
+      <section class="hero" id="mapHeading" aria-label="Заголовок карты">
+        <h1><span id="mapTitle" data-map-field="title" contenteditable="false" spellcheck="false">Название карты</span><br><em id="mapSubtitle" data-map-field="subtitle" contenteditable="false" spellcheck="false">тема × направления</em></h1>
+        <button class="card-action drag-handle heading-handle edit-only edit-control" hidden disabled title="Перетащить заголовок" aria-label="Перетащить заголовок">⠿</button>
+      </section>
+      <div id="nodes"></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- Один образец карточки; новые узлы создаются из этого шаблона. -->
+<template id="node-template">
+  <article class="node-card">
+    <button class="port" data-side="top" aria-label="Соединить: сверху" title="Протяните к точке другой карточки"></button>
+    <button class="port" data-side="right" aria-label="Соединить: справа" title="Протяните к точке другой карточки"></button>
+    <button class="port" data-side="bottom" aria-label="Соединить: снизу" title="Протяните к точке другой карточки"></button>
+    <button class="port" data-side="left" aria-label="Соединить: слева" title="Протяните к точке другой карточки"></button>
+    <div class="thumb t0"><div class="num">01</div><div class="card-title" contenteditable="false" spellcheck="false" data-field="title">Название раздела</div></div>
+    <div class="card-body">
+      <div class="meta"><b contenteditable="false" data-field="label1">Параметр</b><span contenteditable="false" data-field="value1">Заполните значение</span></div>
+      <div class="meta"><b contenteditable="false" data-field="label2">Параметр</b><span contenteditable="false" data-field="value2">Заполните значение</span></div>
+      <div class="meta"><b contenteditable="false" data-field="label3">Параметр</b><span contenteditable="false" data-field="value3">Заполните значение</span></div>
+      <div class="details" hidden><div class="dwrap">
+        <p contenteditable="false" data-field="description">Кратко опишите идею, назначение и пользу этого блока.</p>
+        <div class="sub" contenteditable="false" data-field="tagsTitle">Ключевые понятия</div>
+        <div class="tags"><i contenteditable="false" data-field="tag1">Понятие</i><i contenteditable="false" data-field="tag2">Понятие</i></div>
+        <div class="sub" contenteditable="false" data-field="listTitle">Детали и следующие шаги</div>
+        <ul>
+          <li contenteditable="false" data-field="item1">Пункт, критерий или следующий шаг</li>
+          <li contenteditable="false" data-field="item2">Пункт, критерий или следующий шаг</li>
+        </ul>
+      </div></div>
+    </div>
+    <div class="card-foot">
+      <button class="more" aria-expanded="false">Подробнее</button>
+      <div class="card-actions">
+        <button class="card-action duplicate" title="Дублировать карточку" aria-label="Дублировать карточку">⧉</button>
+        <button class="card-action delete" title="Удалить карточку" aria-label="Удалить карточку">×</button>
+        <button class="card-action drag-handle" title="Перетащить карточку" aria-label="Перетащить карточку">⠿</button>
+      </div>
+    </div>
+  </article>
+</template>
+<div id="hint" role="status" aria-live="polite">Просмотр · фон — перемещение карты · колесо — масштаб · для изменений включите режим редактирования</div>
+<div class="toolbar">
+  <button class="tool active" id="toolPan" title="Перемещение" aria-label="Перемещение" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg></button>
+  <button class="tool" id="toolPen" title="Карандаш" aria-label="Карандаш" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M17 3l4 4L8 20l-5 1 1-5L17 3z"/></svg></button>
+  <button class="tool" id="toolUndo" title="Отменить штрих" aria-label="Отменить штрих"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+  <button class="tool" id="toolClear" title="Стереть рисунок" aria-label="Стереть рисунок"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13h10l1-13"/></svg></button>
+  <div class="sep"></div>
+  <button class="tool" id="zoomOut" title="Уменьшить" aria-label="Уменьшить">−</button>
+  <div class="zoom-val" id="zoomVal">100%</div>
+  <button class="tool" id="zoomIn" title="Увеличить" aria-label="Увеличить">+</button>
+  <button class="tool" id="zoomFit" title="Показать всю карту" aria-label="Показать всю карту"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+</div>
+<!-- Для новой карты меняются только данные. id узлов постоянны; стороны: top/right/bottom/left. -->
+<script type="application/json" id="map-data">
+{"title":"Готовые решения для бизнеса","subtitle":"конкретные задачи → готовый результат","heading":{"x":2360,"y":800},"nodes":[{"id":"business-1","x":1850,"y":1100,"color":"t1","fields":{"title":"Продажи и маркетинг","label1":"Решения","value1":"2"},"items":[{"id":"site-lead","title":"Заявка с сайта сразу попадает в работу — без ручного переноса","description":"Клиент оставляет обращение на сайте, и система запускает его обработку, подключает нужный сценарий ответа и сообщает о новой заявке. Процесс связывает сайт, систему учёта клиентов и Telegram, чтобы обращение не приходилось переносить между сервисами вручную. Вы получаете уведомление и видите, что произошло с заявкой. Это сокращает организационную задержку; оформление заказа, оплата и закрытие сделки не входят в описанный сценарий.","open":false,"hvacRecommended":true},{"id":"sales-bot","title":"Telegram-продавец: отвечает клиентам по материалам компании","description":"Клиент пишет в Telegram-бота, а система обрабатывает вопрос по заранее настроенным инструкциям и подключённым материалам компании. Вместо ручной подготовки каждого типового ответа вы получаете постоянную точку общения с клиентами, связанную с документами бизнеса. Бот объясняет предложение компании и поддерживает диалог по заданным правилам. Такой процесс снимает часть повторяющихся вопросов с команды; оформление заказа и оплата в описанный сценарий не входят.","open":false}],"open":false},{"id":"business-3","x":3450,"y":1100,"color":"t3","fields":{"title":"Исследования и аналитика","label1":"Решения","value1":"9"},"items":[{"id":"reels-link-analysis","title":"Разбор Reels по ссылке: текст, хук и структура ролика","description":"Вы отправляете ссылку на Reels или TikTok в Telegram, и система сама определяет тип видео и запускает нужную обработку. Автоматизация получает расшифровку речи, разбирает начало, удерживающее внимание, последовательность смысловых блоков и ключевые фразы. Готовый отчёт сохраняется в базе материалов, чтобы удачные приёмы можно было изучать и сравнивать. Это помогает быстрее разбирать референсы для своих роликов; объяснение популярности остаётся аналитической гипотезой, а не доказанной причиной успеха.","open":false},{"id":"reels-monitor","title":"База успешных Reels конкурентов — с ежедневным обновлением","description":"Вы задаёте Instagram-профили, за которыми нужно следить. Система собирает доступные Reels, просмотры, реакции и описания, распознаёт речь и подготавливает разбор начала и структуры каждого ролика. Информация сохраняется в таблице и обновляется по настроенному расписанию. Маркетолог получает накопленную базу примеров вместо ручного просмотра аккаунтов каждый день. Анализ помогает выбирать идеи для тестирования, но статистика площадки и выводы системы сами по себе не гарантируют результат ваших будущих публикаций.","open":false},{"id":"tiktok-trends","title":"TikTok-тренды вашей ниши — со сценариями на основе найденного","description":"Система получает выбранный профиль или запрос по тематике и собирает подходящие TikTok-видео. Автоматизация анализирует доступные показатели, распознаёт речь с временными отметками и заносит материалы в таблицу. На основе расшифровок можно подготовить сценарии для новых видео, не переписывая увиденное вручную. Решение ускоряет изучение конкурентов и поиск форматов для теста; доступность данных зависит от внешнего сервиса, а использование чужих идей требует самостоятельной адаптации и проверки.","open":false},{"id":"youtube-monitor","title":"Новые видео конкурентов — сразу в таблицу и Telegram","description":"Вы задаёте список YouTube-каналов, и система регулярно проверяет появление новых длинных видео. Автоматизация фильтрует материалы по времени публикации, получает доступные просмотры, реакции и теги и сохраняет сведения в таблице. Уведомление в Telegram содержит превью и ссылку, чтобы команда быстро выбрала, что изучить. Это избавляет от ручного обхода каналов; расшифровка и содержательный разбор видео в этой базовой версии не заявлены как готовые функции.","open":false},{"id":"youtube-analysis","title":"YouTube-видео — в расшифровку и отчёт без ручного просмотра","description":"Система отслеживает новые длинные видео выбранных каналов, получает полную расшифровку с временными отметками и текст для анализа. Затем подготавливает отчёт о содержании, сильных и слабых сторонах материала и отправляет результат в Telegram. Уже обработанные видео учитываются, чтобы не выполнять одну работу повторно. Решение помогает быстро отбирать полезные материалы для исследования рынка или контента; значимые выводы нужно сверять с самим видео, поскольку распознавание речи и оценка могут ошибаться.","open":false},{"id":"research-report","title":"Тема исследования — в документ и отчёт для команды","description":"Вы задаёте тему и запускаете настроенную цепочку исследования. Система собирает информацию через поисковый сервис, обрабатывает материалы несколькими специализированными шагами и подготавливает текст для документа. В описанном процессе предусмотрены создание отчёта в PDF и отправка результата в Telegram. Это сокращает первоначальный сбор и оформление материалов для статей, исследований и полезных клиентских документов. Для решений, влияющих на бюджет или стратегию, источники, даты и выводы обязательно проверяет человек.","open":false},{"id":"news-monitor","title":"Новости и YouTube-тренды по вашей теме — без ежедневного поиска","description":"Вы задаёте ключевые слова и интересующие каналы, а система по расписанию собирает свежие новости и видео. Автоматизация обрабатывает найденные материалы, при необходимости получает расшифровки и сохраняет информацию в базе. Результаты доступны через настроенный канал общения, включая Telegram, и могут использоваться для подготовки контента. Команда меньше времени тратит на поиск инфоповодов и получает регулярный поток материалов; достоверность источников и полезность подборки нужно оценивать по своей задаче.","open":false},{"id":"threads-monitor","title":"Популярные публикации Threads — в обновляемую базу идей","description":"Система собирает посты и комментарии выбранных пользователей Threads и ищет материалы по ключевым словам. Найденные публикации поступают в собственную базу, которая может обновляться раз в сутки по настроенному процессу. Запросы к системе доступны через Telegram-бота или подключённого управляющего помощника. Маркетолог получает структурированный материал для изучения тем и реакции аудитории, а не разрозненные ссылки. Это сбор и анализ контента: автоматическая публикация ваших постов в этом сценарии не подтверждена.","open":false},{"id":"x-monitor","title":"Мониторинг X: популярные темы — в идеи для ваших публикаций","description":"Вы выбираете ключевые слова и аккаунты в X, ранее Twitter. Система собирает подходящие публикации, фильтрует материалы по заданным условиям и сохраняет результат в таблице. Затем может переработать найденные темы в заготовки контента и передать их в подключённый канал. Это помогает регулярно изучать обсуждения своей ниши без ручного поиска; автоматические ответы и размещение требуют отдельного контроля, а переработка текста не отменяет проверки самостоятельности материала и прав автора.","open":false}],"open":false},{"id":"business-4","x":1850,"y":2500,"color":"t4","fields":{"title":"Базы знаний и обучение","label1":"Решения","value1":"3"},"items":[{"id":"document-consultant","title":"Консультант по вашим прайсам и инструкциям — в рабочем чате","description":"Вы подключаете документы компании: прайсы, инструкции и ответы на частые вопросы. Система загружает материалы в поисковую базу, находит относящиеся к вопросу фрагменты и использует их для ответа пользователю в подключённом чате. Такой консультант помогает клиентам или сотрудникам получать информацию без постоянного ручного поиска по файлам. Это готовый сценарий работы с документами, а не просто папка заметок; актуальность материалов, доступ к данным и качество ответов нужно контролировать.","open":false},{"id":"video-knowledge","title":"Telegram-консультант, который отвечает по вашим обучающим видео","description":"Вы подключаете YouTube-канал с материалами, которые имеете право использовать. Система по расписанию проверяет новые видео, получает их расшифровки и добавляет содержание в базу знаний. Telegram-бот отвечает на вопросы по накопленному материалу, поэтому сотруднику или клиенту не нужно пересматривать весь архив ради одного объяснения. Решение полезно для экспертных и обучающих проектов; ответы необходимо проверять, а доступ к базе и допустимость использования видео определять до запуска.","open":false},{"id":"staff-tutor","title":"Помощник для обучения сотрудников по внутренним инструкциям","description":"Вы загружаете учебные материалы, внутренние инструкции или руководства в базу обучающей системы. При обращении пользователя автоматизация сначала находит нужную информацию, затем подготавливает понятное объяснение по заданным правилам. Сотрудники получают помощь по рабочим материалам вместо повторных вопросов руководителю и поиска по длинным документам. Решение не обещает автоматически аттестовать персонал или заменить наставника: содержание ответов, доступ к внутренним данным и результат обучения нужно проверять отдельно.","open":false}],"open":false},{"id":"business-5","x":2650,"y":2500,"color":"t5","fields":{"title":"Контент и социальные сети","label1":"Решения","value1":"9"},"items":[{"id":"link-content","title":"Одна ссылка — материалы для нескольких социальных сетей","description":"Вы передаёте системе ссылку на исходную публикацию или видео через настроенный канал приёма. Автоматизация получает материал, а для видео использует распознавание речи, затем подготавливает сценарии или тексты под выбранные социальные сети. Вместо ручного просмотра, выписывания мыслей и нескольких отдельных заданий вы получаете заготовки для дальнейшей публикации. Это помогает повторно использовать полезный материал; возможность автоматического размещения зависит от выбранной версии процесса и не предполагается для каждой площадки.","open":false,"rating":8.5},{"id":"content-calendar","title":"Контент-план, тексты и изображения — одним запуском","description":"Вы задаёте тему и правила подготовки контента, затем запускаете настроенную систему. Автоматизация создаёт идеи, тексты и изображения, выбирает подходящие варианты и заносит материалы в календарь публикаций. В описанной связке предусмотрена настройка автоматического размещения, в том числе во ВКонтакте и Дзене. Команда получает организованный запас контента вместо разрозненных черновиков; перед подключением автопубликации нужно проверить факты, стиль, качество картинок и права доступа к каналам.","open":false,"rating":8,"hvacRecommended":true},{"id":"personal-script","title":"Сценарий под ваш бренд из понравившегося Reels или Shorts","description":"Вы отправляете Telegram-боту ссылку на ролик в Instagram, YouTube или TikTok. Система получает расшифровку и на её основе создаёт новый сценарий с учётом заранее заданного авторского стиля. Исходные идеи и подготовленные сценарии сохраняются отдельно, поэтому к удачным материалам можно возвращаться. Решение убирает ручную расшифровку и первоначальную адаптацию; результатом является текст сценария, а не снятое или смонтированное видео. Перед использованием нужно проверить самостоятельность и факты текста.","open":false},{"id":"long-to-shorts","title":"Длинное YouTube-видео — в подборку коротких роликов","description":"Система замечает новое длинное видео на подключённом YouTube-канале и передаёт его сервису автоматической нарезки. После обработки получает короткие ролики, подготавливает описания, сохраняет сведения о материалах и отправляет уведомление в Telegram. Так вебинар, интервью или выступление можно использовать повторно, не просматривая весь материал ради каждого фрагмента. Количество и качество подходящих роликов зависят от исходного видео; выбранные фрагменты и возможность публикации необходимо проверить перед выпуском.","open":false},{"id":"avatar-pipeline","title":"Видео с цифровым ведущим — от новости до публикации","description":"Автоматизация получает новости из настроенного источника, создаёт сценарий и заголовок, затем запускает генерацию ролика с цифровым ведущим и озвучкой. Готовое видео передаётся в подключённый сервис размещения в социальных сетях. Это повторяемая производственная цепочка, которая уменьшает потребность в постоянных съёмках типовых выпусков. До запуска проверяются качество речи, факты, образ ведущего и права на его использование; доступность публикации зависит от аккаунтов и внешних сервисов.","open":false,"rating":7},{"id":"video-bot","title":"Видео по заданию в Telegram — без переходов между генераторами","description":"Вы отправляете задание через Telegram-бота, а система подготавливает сценарий и субтитры, запускает внешний видеосервис и обрабатывает готовый результат. В описанном процессе предусмотрены сохранение материалов и вариант передачи ролика на публикацию. Вместо последовательных ручных действий в нескольких сервисах команда получает единый вход для выпуска видео. Это удобно для повторяющихся форматов; время обработки, расходы на генерацию и качество ролика зависят от выбранного сервиса и требуют проверки.","open":false,"rating":7},{"id":"news-posts","title":"Свежие новости вашей ниши — в готовые черновики публикаций","description":"Система ищет актуальные новости по настроенной теме и использует найденные материалы для подготовки контента. Результаты проходят через повторяемую цепочку, связанную с Telegram и хранилищем материалов, например таблицей или календарём. Вы получаете основу постов для выбранных социальных сетей без ежедневного ручного поиска инфоповодов. Автоматизация особенно полезна команде, которая регулярно объясняет события рынка; перед публикацией нужно проверить дату, достоверность новости и соответствие позиции компании.","open":false},{"id":"threads-publish","title":"Публикации в Threads с автоматической сменой тем и форматов","description":"Система собирает материалы из нескольких настроенных источников: новости, практические советы, исторические факты и обсуждения. Перед подготовкой следующего поста анализирует предыдущие публикации и выбирает тип контента, чтобы лента не состояла из однообразных сообщений. Затем создаёт текст в заданном стиле и запускает размещение в Threads; управление процессом связано с таблицей. Это уменьшает ручную работу над регулярным выпуском, но не гарантирует охваты: факты, стиль и правила площадки нужно контролировать.","open":false},{"id":"content-factory","title":"Контент-завод: свежие идеи и видео — в запас готовых постов","description":"Система отслеживает материалы по ключевым словам, отбирает подходящий контент и расшифровывает видео. Затем подготавливает посты, сравнивает варианты и сохраняет тексты вместе с исходными материалами. Команда получает запас публикаций и сценариев вместо ежедневного поиска тем и работы с пустого листа. В описанном примере размещение подготовленных постов выполняется вручную: автоматический выпуск нельзя считать частью этой версии. Решение автоматизирует подготовку контента, а редактор сохраняет контроль над публикацией.","open":false}],"open":false},{"id":"business-6","x":3450,"y":2500,"color":"t7","fields":{"title":"Изображения и рекламные видео","label1":"Решения","value1":"3"},"items":[{"id":"marketplace-images","title":"Фотография товара — в новые изображения для карточки и рекламы","description":"Вы отправляете исходное фото через Telegram-бота, и система сохраняет его в подключённое хранилище. Затем подготавливает задание на обработку, запускает генератор изображений и возвращает результат в Telegram. Так продавец получает повторяемый путь от исходного материала до новых визуалов без ручного переключения между сервисами. Решение сокращает подготовку изображений для ассортимента; соответствие реальному товару, текст на картинке и требования конкретной площадки проверяются перед использованием.","open":false,"rating":8},{"id":"product-video","title":"Фото товара — в рекламный видеоролик","description":"Вы отправляете исходную фотографию и задание через Telegram-бота. Система подготавливает рекламное изображение, при необходимости добавляет персонажа, затем передаёт материал видеогенератору и сохраняет полученный ролик в подключённое хранилище. В этой цепочке сначала создаётся изображение, а затем оно оживляется; команда получает результат без ручного запуска каждого этапа. Решение ускоряет выпуск рекламы товаров и услуг, но внешний вид продукта, точность деталей и качество движения необходимо проверить перед использованием.","open":false},{"id":"image-bot","title":"Изображения по тексту, голосу или файлу — через Telegram","description":"Вы отправляете боту текстовое задание, голосовое сообщение или файл. Система преобразует запрос в задание для генератора, создаёт или редактирует изображение, сохраняет файл и возвращает результат в Telegram. Команда получает один понятный способ заказывать визуалы без самостоятельного запуска каждой операции в разных сервисах. Такой процесс подходит для повторяющихся задач по контенту и рекламе; качество изображения, стоимость генерации и возможность использования результата необходимо проверить под ваш формат.","open":false}],"open":false}],"edges":[],"ink":[]}
+</script>
+
+<script>
+
+'use strict';
+const viewport=document.getElementById('viewport'), canvas=document.getElementById('canvas');
+const board=document.getElementById('board'), nodesLayer=document.getElementById('nodes');
+const wires=document.getElementById('wires'), ink=document.getElementById('ink');
+const template=document.getElementById('node-template'), hint=document.getElementById('hint');
+const heading=document.getElementById('mapHeading');
+const W=6000,H=9000,MIN_S=.04,MAX_S=3,NS='http://www.w3.org/2000/svg';
+const sides=['top','right','bottom','left'], elements=new Map();
+const map=JSON.parse(document.getElementById('map-data').textContent);
+map.heading=map.heading||{x:2400,y:3900};map.subtitle=map.subtitle??'тема × направления';
+let tx=0,ty=0,scale=1,pen=false,editing=false,gesture=null,pendingPort=null;
+const pointers=new Map();
+const viewHelp='Просмотр · фон — перемещение карты · колесо — масштаб · для изменений включите режим редактирования';
+const editHelp='Редактирование · текст — изменить · ⠿ — свободное перемещение · точки — связи · удаления с подтверждением';
+function defaultHelp(){return editing?editHelp:viewHelp;}
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const getNode=id=>map.nodes.find(n=>n.id===id);
+function setHint(message){hint.textContent=message||defaultHelp();}
+function positionHeading(){heading.style.left=map.heading.x+'px';heading.style.top=map.heading.y+'px';}
+function headingBounds(){
+  const label=heading.querySelector('h1');
+  return {x:map.heading.x+label.offsetLeft,y:map.heading.y+label.offsetTop,w:label.offsetWidth,h:label.offsetHeight+40};
+}
+function applyEditControls(root){
+  root.querySelectorAll('[data-field]').forEach(f=>f.setAttribute('contenteditable',String(editing)));
+  root.querySelectorAll('[data-map-field]').forEach(f=>f.setAttribute('contenteditable',String(editing)));
+  root.querySelectorAll('.edit-only').forEach(e=>e.hidden=!editing);
+  root.querySelectorAll('.edit-control').forEach(e=>e.disabled=!editing);
+  root.querySelectorAll('.port').forEach(e=>{e.hidden=!editing;e.disabled=!editing;});
+  root.querySelectorAll('.duplicate').forEach(e=>e.disabled=!editing);
+  root.querySelectorAll('.delete').forEach(e=>e.disabled=!editing);
+  root.querySelectorAll('.drag-handle').forEach(e=>e.disabled=!editing);
+  root.querySelectorAll('.card-actions').forEach(e=>e.hidden=!editing);
+  ['toolPen','toolUndo','toolClear'].forEach(id=>{const el=root.querySelector('#'+id);if(el){el.hidden=!editing;el.disabled=!editing;}});
+}
+function syncText(){
+  map.nodes.forEach(n=>elements.get(n.id).querySelectorAll('[data-field]').forEach(f=>n.fields[f.dataset.field]=editableText(f)));
+  map.title=editableText(document.getElementById('mapTitle')).trim()||'Название карты';
+  map.subtitle=editableText(document.getElementById('mapSubtitle'));
+}
+function setEditing(value){
+  syncText();cancelGesture();cancelConnection();setPen(false);editing=!!value;
+  document.body.classList.toggle('editing',editing);applyEditControls(document);
+  const toggle=document.getElementById('editToggle');toggle.setAttribute('aria-pressed',String(editing));
+  toggle.textContent=editing?'Завершить редактирование':'Режим редактирования';
+  if(!editing&&document.activeElement&&document.activeElement.closest('[contenteditable]'))document.activeElement.blur();
+  drawWires();setHint();
+}
+function apply(){
+  canvas.style.transform='translate('+tx+'px, '+ty+'px) scale('+scale+')';
+  document.getElementById('zoomVal').textContent=Math.round(scale*100)+'%';
+}
+function zoomAt(x,y,factor){
+  const next=clamp(scale*factor,MIN_S,MAX_S);
+  tx=x-(x-tx)*next/scale;ty=y-(y-ty)*next/scale;scale=next;apply();
+}
+function point(e){return {x:(e.clientX-tx)/scale,y:(e.clientY-ty)/scale};}
+function fitView(){
+  const bounds=map.nodes.map(n=>{
+    const c=elements.get(n.id);return {x:n.x,y:n.y,w:c.offsetWidth,h:c.offsetHeight};
+  });
+  bounds.push(headingBounds());
+  const left=Math.min(...bounds.map(b=>b.x)),top=Math.min(...bounds.map(b=>b.y));
+  const right=Math.max(...bounds.map(b=>b.x+b.w)),bottom=Math.max(...bounds.map(b=>b.y+b.h));
+  const headerBottom=document.querySelector('header').getBoundingClientRect().bottom;
+  const upper=Math.max(90,headerBottom+30),lower=innerHeight-105;
+  scale=clamp(Math.min(1,Math.max(80,innerWidth-80)/(right-left+40),Math.max(80,lower-upper)/(bottom-top+40)),MIN_S,MAX_S);
+  tx=innerWidth/2-(left+right)*scale/2;ty=(upper+lower)/2-(top+bottom)*scale/2;apply();
+}
+function positionNode(n){
+  const c=elements.get(n.id);c.style.left=n.x+'px';c.style.top=n.y+'px';
+}
+const sizes=new ResizeObserver(()=>{
+  map.nodes.forEach(n=>{
+    const c=elements.get(n.id);if(c&&!Array.isArray(n.items)&&n.open)c.querySelector('.details').style.maxHeight=c.querySelector('.details').scrollHeight+'px';
+  });
+  drawWires();
+});
+function updateCatalogButton(n){
+  const c=elements.get(n.id),all=n.items.length>0&&n.items.every(item=>item.open);
+  c.querySelector('.more').setAttribute('aria-expanded',String(all));
+  c.querySelector('.more').textContent=all?'Свернуть описания':'Раскрыть описания';
+  n.open=all;
+}
+function setSolution(n,index,open){
+  const item=n.items[index],c=elements.get(n.id),row=c.querySelectorAll('.solution-item')[index];
+  item.open=!!open;row.querySelector('.solution-toggle').setAttribute('aria-expanded',String(item.open));
+  row.querySelector('.solution-description').hidden=!item.open;updateCatalogButton(n);drawWires();
+}
+function renderSolutions(n,c){
+  if(!Array.isArray(n.items))return;
+  c.classList.add('catalog-card');
+  c.querySelectorAll('.meta').forEach((row,i)=>{if(i>0)row.hidden=true;});
+  const list=document.createElement('div');list.className='solution-list';
+  n.items.forEach((item,i)=>{
+    const row=document.createElement('div');row.className='solution-item';
+    const button=document.createElement('button');button.className='solution-toggle'+(item.rating>=8.5?' priority':'')+(item.hvacRecommended?' hvac-fit':'');button.type='button';
+    button.setAttribute('aria-expanded',String(!!item.open));
+    const title=document.createElement('span');title.dataset.field='solution-'+i+'-title';
+    title.textContent=n.fields[title.dataset.field]??item.title;button.appendChild(title);
+    const description=document.createElement('div');description.className='solution-description';
+    description.dataset.field='solution-'+i+'-description';
+    description.id='solution-'+n.id+'-'+i;description.textContent=n.fields[description.dataset.field]??item.description;
+    description.hidden=!item.open;button.setAttribute('aria-controls',description.id);
+    row.appendChild(button);row.appendChild(description);list.appendChild(row);
+  });
+  c.querySelector('.card-body').appendChild(list);
+}
+function renderNode(n){
+  const c=template.content.firstElementChild.cloneNode(true);c.dataset.id=n.id;
+  c.querySelector('.thumb').className='thumb '+(/^t[0-9]$/.test(n.color)?n.color:'t0');
+  c.querySelector('.num').textContent=String(map.nodes.indexOf(n)+1).padStart(2,'0');
+  renderSolutions(n,c);
+  c.querySelectorAll('[data-field]').forEach(field=>{
+    const key=field.dataset.field;
+    if(Object.prototype.hasOwnProperty.call(n.fields,key))field.textContent=n.fields[key];
+    else n.fields[key]=field.textContent;
+  });
+  const details=c.querySelector('.details');details.id='details-'+n.id;
+  c.querySelector('.more').setAttribute('aria-controls',details.id);
+  elements.set(n.id,c);nodesLayer.appendChild(c);positionNode(n);
+  if(Array.isArray(n.items)){c.querySelector('.details').hidden=true;updateCatalogButton(n);}else setOpen(n,!!n.open);
+  sizes.observe(c);sizes.observe(c.querySelector('.dwrap'));applyEditControls(c);
+  requestAnimationFrame(()=>c.classList.add('show'));
+}
+function setOpen(n,open){
+  if(Array.isArray(n.items)){n.items.forEach((item,i)=>setSolution(n,i,open));return;}
+  n.open=open;const c=elements.get(n.id),details=c.querySelector('.details');
+  details.hidden=false;details.inert=!open;
+  c.classList.toggle('open',open);details.style.maxHeight=open?details.scrollHeight+'px':'0px';
+  c.querySelector('.more').setAttribute('aria-expanded',String(open));drawWires();
+}
+function toggleAll(open){map.nodes.forEach(n=>setOpen(n,open));}
+function nodeBounds(n){
+  const c=elements.get(n.id);return {x:n.x,y:n.y,w:c.offsetWidth,h:c.offsetHeight};
+}
+function reservedBounds(n){
+  const b=nodeBounds(n),c=elements.get(n.id),details=c.querySelector('.details');
+  // Reserve room for details without moving neighbors when a card opens.
+  b.h=Array.isArray(n.items)?Math.max(1250,b.h):Math.max(620,b.h-details.offsetHeight+details.scrollHeight+20);return b;
+}
+function intersects(a,b){return a.x<b.x+b.w+40&&a.x+a.w+40>b.x&&a.y<b.y+b.h+40&&a.y+a.h+40>b.y;}
+function freePosition(source){
+  const origin=source||map.nodes[0]||{x:2770,y:4200};
+  const height=source?reservedBounds(source).h:1250,candidates=[{x:origin.x,y:origin.y}];
+  for(let ring=1;ring<16;ring++){
+    candidates.push({x:origin.x+ring*800,y:origin.y},{x:origin.x-ring*800,y:origin.y},
+      {x:origin.x,y:origin.y+ring*(height+60)},{x:origin.x,y:origin.y-ring*(height+60)});
+  }
+  for(let y=30;y<=H-height-30;y+=height+60)for(let x=30;x<=W-650;x+=800)candidates.push({x,y});
+  for(const p of candidates){
+    if(p.x<30||p.x>W-650||p.y<30||p.y>H-height-30)continue;
+    const candidate={...p,w:620,h:height};
+    const free=!intersects(candidate,headingBounds())&&map.nodes.every(n=>!intersects(candidate,reservedBounds(n)));
+    if(free)return p;
+  }
+  return null;
+}
+function addNode(source){
+  if(!editing)return;
+  const p=freePosition(source);
+  if(!p){setHint('На холсте не осталось свободного места. Удалите ненужные карточки или перенесите часть идеи в отдельную карту.');return;}
+  let serial=1;while(getNode('node-'+serial))serial++;
+  const n={id:'node-'+serial,x:p.x,y:p.y,color:source?source.color:'t0',fields:source?{...source.fields}:{},...(source&&Array.isArray(source.items)?{items:source.items.map(item=>({...item,open:false}))}:{}),open:false};
+  map.nodes.push(n);renderNode(n);drawWires();fitView();setHint('Карточка добавлена. Соедините точки по краям карточек.');
+}
+function removeNode(id){
+  if(!editing)return;
+  const n=getNode(id);if(!n)return;
+  if(!window.confirm('Удалить карточку «'+(n.fields.title||'Без названия')+'» и все её связи?'))return;
+  cancelGesture();cancelConnection();
+  map.edges=map.edges.filter(e=>e.from!==id&&e.to!==id);
+  map.nodes=map.nodes.filter(n=>n.id!==id);
+  const c=elements.get(id);sizes.unobserve(c);sizes.unobserve(c.querySelector('.dwrap'));c.remove();elements.delete(id);
+  map.nodes.forEach((n,i)=>elements.get(n.id).querySelector('.num').textContent=String(i+1).padStart(2,'0'));
+  drawWires();setHint();
+}
+function anchor(id,side){
+  const n=getNode(id),c=elements.get(id),w=c.offsetWidth,h=c.offsetHeight;
+  if(side==='top')return {x:n.x+w/2,y:n.y,dx:0,dy:-1};
+  if(side==='bottom')return {x:n.x+w/2,y:n.y+h,dx:0,dy:1};
+  if(side==='left')return {x:n.x,y:n.y+h/2,dx:-1,dy:0};
+  return {x:n.x+w,y:n.y+h/2,dx:1,dy:0};
+}
+function curve(a,b){
+  const distance=Math.hypot(b.x-a.x,b.y-a.y),k=Math.min(220,Math.max(35,distance*.35));
+  return 'M '+a.x+' '+a.y+' C '+(a.x+a.dx*k)+' '+(a.y+a.dy*k)+', '+(b.x+b.dx*k)+' '+(b.y+b.dy*k)+', '+b.x+' '+b.y;
+}
+function svg(tag,attrs){
+  const el=document.createElementNS(NS,tag);
+  Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));return el;
+}
+function drawWires(){
+  wires.replaceChildren();
+  map.edges.forEach((e,i)=>{
+    if(!elements.has(e.from)||!elements.has(e.to)||e.from===e.to)return;
+    const d=curve(anchor(e.from,e.fromSide),anchor(e.to,e.toSide));
+    const g=svg('g',{'class':'wire-group','data-edge':i});
+    g.appendChild(svg('path',{d,'class':'wire'}));
+    const hit=svg('path',{d,'class':'wire-hit'});
+    const title=svg('title',{});title.textContent=editing?'Двойной щелчок — удалить связь с подтверждением':'Связь карточек';hit.appendChild(title);
+    g.appendChild(hit);wires.appendChild(g);
+  });
+  if(gesture&&gesture.kind==='link'&&gesture.moved){
+    const a=anchor(gesture.from.id,gesture.from.side),b=gesture.preview;
+    wires.appendChild(svg('path',{d:curve(a,{...b,dx:-a.dx,dy:-a.dy}),'class':'wire-preview'}));
+  }
+}
+function portInfo(el){
+  const port=el&&el.closest('.port');if(!port)return null;
+  return {id:port.closest('.node-card').dataset.id,side:port.dataset.side,element:port};
+}
+function cancelConnection(){
+  pendingPort=null;nodesLayer.querySelectorAll('.port.selected').forEach(p=>p.classList.remove('selected'));setHint();
+}
+function selectPort(p){
+  if(!editing)return;
+  cancelConnection();pendingPort=p;p.element.classList.add('selected');
+  setHint('Выберите точку другой карточки. Escape — отмена.');
+}
+function connect(a,b){
+  if(!editing)return false;
+  if(a.id===b.id){setHint('Выберите другую карточку.');return false;}
+  if(!sides.includes(a.side)||!sides.includes(b.side))return false;
+  const duplicate=map.edges.some(e=>
+    e.from===a.id&&e.to===b.id&&e.fromSide===a.side&&e.toSide===b.side||
+    e.from===b.id&&e.to===a.id&&e.fromSide===b.side&&e.toSide===a.side);
+  if(!duplicate)map.edges.push({from:a.id,fromSide:a.side,to:b.id,toSide:b.side});
+  cancelConnection();drawWires();setHint('Связь создана. Двойной щелчок по линии — удаление с подтверждением.');return true;
+}
+function setPen(v){
+  if(v&&!editing)return;
+  cancelGesture();cancelConnection();pen=v;document.body.classList.toggle('pen',v);
+  document.getElementById('toolPan').classList.toggle('active',!v);
+  document.getElementById('toolPen').classList.toggle('active',v);
+  document.getElementById('toolPan').setAttribute('aria-pressed',String(!v));
+  document.getElementById('toolPen').setAttribute('aria-pressed',String(v));
+  setHint(v?'Карандаш: рисуйте на карте. Кнопка со стрелками возвращает перемещение.':defaultHelp());
+}
+function cancelGesture(){
+  if(gesture&&gesture.card)gesture.card.classList.remove('dragging');
+  if(gesture&&gesture.kind==='node'){
+    gesture.n.x=gesture.x;gesture.n.y=gesture.y;positionNode(gesture.n);
+  }
+  if(gesture&&gesture.kind==='heading'){
+    map.heading.x=gesture.x;map.heading.y=gesture.y;positionHeading();
+  }
+  const active=new Set([...pointers.keys(),...(gesture&&gesture.pointer!==undefined?[gesture.pointer]:[])]);
+  active.forEach(id=>{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id);});
+  gesture=null;pointers.clear();viewport.classList.remove('panning');drawWires();
+}
+viewport.addEventListener('pointerdown',e=>{
+  if(e.button!==0)return;
+  if(gesture){
+    if(e.pointerType!=='touch'||!['pan','draw','pinch'].includes(gesture.kind)||pointers.size!==1)return;
+    e.preventDefault();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const [a,b]=[...pointers.values()];
+    gesture={kind:'pinch',distance:Math.hypot(a.x-b.x,a.y-b.y),x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    viewport.setPointerCapture(e.pointerId);return;
+  }
+  if(pen){
+    e.preventDefault();cancelConnection();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const p=point(e),stroke=svg('path',{d:'M '+p.x+' '+p.y});ink.appendChild(stroke);
+    gesture={kind:'draw',pointer:e.pointerId,stroke,last:p};
+  }else{
+    const port=portInfo(e.target);
+    if(port&&editing){
+      e.preventDefault();gesture={kind:'link',pointer:e.pointerId,from:port,startX:e.clientX,startY:e.clientY,moved:false,preview:point(e)};
+    }else if(editing&&e.target.closest('.heading-handle')){
+      e.preventDefault();cancelConnection();gesture={kind:'heading',pointer:e.pointerId,card:heading,startX:e.clientX,startY:e.clientY,x:map.heading.x,y:map.heading.y};
+      heading.classList.add('dragging');
+    }else if(editing&&e.target.closest('.drag-handle')){
+      e.preventDefault();cancelConnection();const card=e.target.closest('.node-card'),n=getNode(card.dataset.id);
+      gesture={kind:'node',pointer:e.pointerId,card,n,startX:e.clientX,startY:e.clientY,x:n.x,y:n.y};
+      card.classList.add('dragging');
+    }else{
+      if(e.target.closest('.node-card')||e.target.closest('#mapHeading')||(editing&&e.target.closest('.wire-hit')))return;
+      e.preventDefault();cancelConnection();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(pointers.size===2){
+        const [a,b]=[...pointers.values()];
+        gesture={kind:'pinch',distance:Math.hypot(a.x-b.x,a.y-b.y),x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+      }else{gesture={kind:'pan',pointer:e.pointerId,x:e.clientX-tx,y:e.clientY-ty};viewport.classList.add('panning');}
+    }
+  }
+  // Capture at viewport so dragging continues beyond a card or the screen edge.
+  viewport.setPointerCapture(e.pointerId);
+});
+window.addEventListener('pointermove',e=>{
+  if(!gesture)return;
+  if(pointers.has(e.pointerId))pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(gesture.kind==='pinch'){
+    if(pointers.size!==2)return;
+    const [a,b]=[...pointers.values()],distance=Math.hypot(a.x-b.x,a.y-b.y),x=(a.x+b.x)/2,y=(a.y+b.y)/2;
+    if(gesture.distance>0)zoomAt(gesture.x,gesture.y,distance/gesture.distance);
+    tx+=x-gesture.x;ty+=y-gesture.y;apply();Object.assign(gesture,{distance,x,y});return;
+  }
+  if(gesture.pointer!==e.pointerId)return;
+  if(gesture.kind==='node'){
+    gesture.n.x=gesture.x+(e.clientX-gesture.startX)/scale;
+    gesture.n.y=gesture.y+(e.clientY-gesture.startY)/scale;
+    positionNode(gesture.n);drawWires();
+  }else if(gesture.kind==='heading'){
+    map.heading.x=gesture.x+(e.clientX-gesture.startX)/scale;map.heading.y=gesture.y+(e.clientY-gesture.startY)/scale;positionHeading();
+  }else if(gesture.kind==='link'){
+    gesture.moved=gesture.moved||Math.hypot(e.clientX-gesture.startX,e.clientY-gesture.startY)>4;
+    gesture.preview=point(e);drawWires();
+  }else if(gesture.kind==='pan'){
+    tx=e.clientX-gesture.x;ty=e.clientY-gesture.y;apply();
+  }else if(gesture.kind==='draw'){
+    const p=point(e);
+    if(Math.hypot(p.x-gesture.last.x,p.y-gesture.last.y)>1.5/scale){
+      gesture.stroke.setAttribute('d',gesture.stroke.getAttribute('d')+' L '+p.x+' '+p.y);gesture.last=p;
+    }
+  }
+});
+function endPointer(e,cancelled=false){
+  pointers.delete(e.pointerId);
+  if(!gesture)return;
+  if(gesture.kind==='pinch'){
+    if(pointers.size===1){const [id,p]=[...pointers.entries()][0];gesture={kind:'pan',pointer:id,x:p.x-tx,y:p.y-ty};}
+    else if(!pointers.size)gesture=null;
+  }else if(gesture.pointer===e.pointerId){
+    const finished=gesture;gesture=null;
+    if(finished.card)finished.card.classList.remove('dragging');
+    if(finished.kind==='node'&&cancelled){
+      finished.n.x=finished.x;finished.n.y=finished.y;positionNode(finished.n);
+    }
+    if(finished.kind==='heading'&&cancelled){map.heading.x=finished.x;map.heading.y=finished.y;positionHeading();}
+    if(finished.kind==='link'){
+      const target=portInfo(document.elementFromPoint(e.clientX,e.clientY));
+      if(!cancelled&&finished.moved){if(target)connect(finished.from,target);else cancelConnection();}
+      else if(!cancelled){if(pendingPort){if(!connect(pendingPort,finished.from))selectPort(finished.from);}else selectPort(finished.from);}
+      else cancelConnection();
+    }
+  }
+  viewport.classList.remove('panning');
+  if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);
+  drawWires();
+}
+window.addEventListener('pointerup',e=>endPointer(e));
+window.addEventListener('pointercancel',e=>endPointer(e,true));
+window.addEventListener('blur',()=>{cancelGesture();cancelConnection();});
+viewport.addEventListener('wheel',e=>{
+  if(e.target.closest('[contenteditable="true"]')&&document.activeElement===e.target)return;
+  const list=e.target.closest('.solution-list');
+  if(list&&list.scrollHeight>list.clientHeight&&!e.ctrlKey&&!e.shiftKey){e.stopPropagation();return;}
+  e.preventDefault();if(gesture)return;
+  const delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?innerHeight:1);
+  if(e.shiftKey){tx-=delta;apply();return;}zoomAt(e.clientX,e.clientY,Math.exp(-delta*.002));
+},{passive:false});
+nodesLayer.addEventListener('click',e=>{
+  if(pen)return;
+  const card=e.target.closest('.node-card');if(!card)return;
+  const n=getNode(card.dataset.id);
+  const solution=e.target.closest('.solution-toggle');
+  if(solution){
+    if(editing&&e.target.closest('[contenteditable="true"]'))return;
+    const index=[...card.querySelectorAll('.solution-toggle')].indexOf(solution);
+    setSolution(n,index,!n.items[index].open);return;
+  }
+  if(e.target.closest('.more'))setOpen(n,!n.open);
+  if(!editing)return;
+  if(e.target.closest('.duplicate'))addNode(n);
+  if(e.target.closest('.delete'))removeNode(n.id);
+});
+nodesLayer.addEventListener('input',e=>{
+  if(!editing)return;
+  const field=e.target.closest('[data-field]');
+  if(field)getNode(field.closest('.node-card').dataset.id).fields[field.dataset.field]=editableText(field);
+});
+function editableText(field){return typeof field.innerText==='string'?field.innerText:field.textContent;}
+board.addEventListener('paste',e=>{
+  if(!editing)return;
+  if(!e.target.closest('[contenteditable="true"]'))return;
+  e.preventDefault();const selection=window.getSelection();
+  if(!selection.rangeCount)return;const range=selection.getRangeAt(0);
+  range.deleteContents();const text=document.createTextNode(e.clipboardData.getData('text/plain'));range.insertNode(text);
+  range.setStartAfter(text);range.collapse(true);selection.removeAllRanges();selection.addRange(range);
+  e.target.dispatchEvent(new Event('input',{bubbles:true}));
+});
+nodesLayer.addEventListener('keydown',e=>{
+  if(!editing)return;
+  const port=portInfo(e.target);
+  if(port&&(e.key==='Enter'||e.key===' ')){e.preventDefault();if(pendingPort)connect(pendingPort,port);else selectPort(port);}
+});
+wires.addEventListener('dblclick',e=>{
+  if(!editing||pen)return;const group=e.target.closest('[data-edge]');if(!group)return;
+  if(!window.confirm('Удалить эту связь между карточками?'))return;
+  map.edges.splice(Number(group.dataset.edge),1);drawWires();setHint('Связь удалена.');
+});
+window.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){cancelGesture();cancelConnection();}
+});
+document.getElementById('toolPan').addEventListener('click',()=>setPen(false));
+document.getElementById('toolPen').addEventListener('click',()=>setPen(true));
+document.getElementById('toolUndo').addEventListener('click',()=>{if(editing&&ink.lastElementChild&&window.confirm('Удалить последний штрих рисунка?'))ink.lastElementChild.remove();});
+document.getElementById('toolClear').addEventListener('click',()=>{if(editing&&ink.lastElementChild&&window.confirm('Стереть весь рисунок? Карточки и связи сохранятся.'))ink.replaceChildren();});
+document.getElementById('zoomIn').addEventListener('click',()=>zoomAt(innerWidth/2,innerHeight/2,1.25));
+document.getElementById('zoomOut').addEventListener('click',()=>zoomAt(innerWidth/2,innerHeight/2,.8));
+document.getElementById('zoomFit').addEventListener('click',fitView);
+document.getElementById('addNode').addEventListener('click',()=>addNode());
+document.getElementById('openAll').addEventListener('click',()=>toggleAll(true));
+document.getElementById('closeAll').addEventListener('click',()=>toggleAll(false));
+function saveMap(){
+  syncText();
+  const state={...map,ink:[...ink.querySelectorAll('path')].map(p=>p.getAttribute('d'))};
+  const clone=document.documentElement.cloneNode(true);
+  clone.querySelector('#map-data').textContent=JSON.stringify(state).replace(/</g,'\\u003c');
+  clone.querySelector('#nodes').replaceChildren();clone.querySelector('#wires').replaceChildren();clone.querySelector('#ink').replaceChildren();
+  clone.querySelector('#canvas').removeAttribute('style');clone.querySelector('#hint').textContent=viewHelp;
+  clone.querySelector('body').classList.remove('editing');
+  clone.querySelectorAll('[contenteditable]').forEach(e=>e.setAttribute('contenteditable','false'));
+  clone.querySelectorAll('.edit-only').forEach(e=>e.hidden=true);
+  clone.querySelectorAll('.edit-control').forEach(e=>e.disabled=true);
+  ['toolPen','toolUndo','toolClear'].forEach(id=>{const e=clone.querySelector('#'+id);e.hidden=true;e.disabled=true;});
+  const toggle=clone.querySelector('#editToggle');toggle.textContent='Режим редактирования';toggle.setAttribute('aria-pressed','false');
+  clone.querySelector('#mapHeading').classList.remove('dragging');
+  clone.querySelector('#toolPan').classList.add('active');clone.querySelector('#toolPan').setAttribute('aria-pressed','true');
+  clone.querySelector('#toolPen').classList.remove('active');clone.querySelector('#toolPen').setAttribute('aria-pressed','false');
+  clone.querySelector('body').classList.remove('pen');clone.querySelector('#viewport').classList.remove('panning');
+  clone.querySelector('title').textContent=state.title+' · Карта Макса';
+  const blob=new Blob(['<!DOCTYPE html>\n'+clone.outerHTML],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;
+  a.download=state.title.replace(/[<>:"/\\|?*\u0000-\u001f]/g,'-')+'.html';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);setHint('Скачана HTML-копия с вашими карточками, связями и рисунком.');
+}
+document.getElementById('saveMap').addEventListener('click',saveMap);
+document.getElementById('editToggle').addEventListener('click',()=>setEditing(!editing));
+document.getElementById('mapTitle').textContent=map.title;
+document.getElementById('mapSubtitle').textContent=map.subtitle;positionHeading();
+map.nodes.forEach(renderNode);
+(map.ink||[]).forEach(d=>ink.appendChild(svg('path',{d})));
+applyEditControls(document);drawWires();fitView();
+window.addEventListener('resize',()=>{if(!gesture)fitView();});
+// Инициализация без измерения карточек в потоке: x/y берутся только из map-data.
+
+</script>
+</body>
+</html>
